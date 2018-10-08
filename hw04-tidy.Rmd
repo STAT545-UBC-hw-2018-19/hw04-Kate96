@@ -1,0 +1,179 @@
+---
+title: "hw04-tidy"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Data reshaping
+##### Activity 2
+Make a tibble with one row per year and columns for life expectancy for two or more countries.
+
+Use knitr::kable() to make this table look pretty in your rendered homework.
+
+Take advantage of this new data shape to scatterplot life expectancy for one country against that of another.
+
+```{r load}
+suppressPackageStartupMessages(library("gapminder"))
+suppressPackageStartupMessages(library("tidyverse"))
+```
+
+```{r tibble}
+gapminder_tidy <- gapminder %>% 
+  filter(country == "Canada" | country == "United States") %>% 
+  select(country, year, lifeExp) %>% 
+  group_by(year) %>% 
+  spread(key = "country", value = "lifeExp")
+knitr::kable(gapminder_tidy)
+```
+
+```{r plot_lifeExp_Canada_vs_US}
+gapminder_tidy %>% 
+  ggplot(aes(Canada, `United States`)) +
+  geom_point()
+```
+
+Over the years 1952-2007, life expectancy in both countries (Canada and US) was increasing. We can observe a positive correlation in the scatterplot. Overall, Canada had slightly higher life expectancy than US.
+
+### Joining tables
+##### Activity 1
+
+Create a second data frame, complementary to Gapminder. Join this with (part of) Gapminder using a dplyr join function and make some observations about the process and result. Explore the different types of joins.
+
+```{r country_tibble}
+countries_18 <- tibble(country = c("Canada",
+                                "Australia",
+                                "New Zealand",
+                                "United States",
+                                "Mexico",
+                                "France",
+                                "Norway",
+                                "Greece",
+                                "China",
+                                "Japan",
+                                "Turkey",
+                                "Zimbabwe",
+                                "Uruguay",
+                                "Brazil",
+                                "Somalia",
+                                "Thailand",
+                                "Ethiopia",
+                                "Russia"),
+                    capital = c("Ottawa",
+                                "Canberra",
+                                "Wellington",
+                                "Washington",
+                                "Mexico City",
+                                "Paris",
+                                "Oslo",
+                                "Athens",
+                                "Beijing",
+                                "Tokyo",
+                                "Ankara",
+                                "Harare",
+                                "Montevideo",
+                                "Brasilia",
+                                "Mogadishu",
+                                "Bangkok",
+                                "Addis Ababa",
+                                "Moscow"))
+```
+
+The tibble consists of 18 (random) countries and an additional information about them (capital) not mentioned in the gapminder data set.
+
+```{r inner}
+joined_inner <- inner_join(gapminder, countries_18)
+
+str(joined_inner)
+levels(as.factor(joined_inner$country))
+levels(as.factor(joined_inner$year))
+
+knitr::kable(joined_inner)
+```
+
+
+`inner_join()` function keeps the rows that are present in both data frames. In this case, it happens using the column `country` (same column name in both tibbles). The resulting dataset consists of 7 columns (6 from gapminder and one from countries tibble). There are 204 rows because each of the 17 countries has data from 12 different years. One country (Russia) from countries_18 is not present in gapminder so it is removed.
+
+```{r left}
+joined_left <- left_join(gapminder, countries_18)
+
+str(joined_left)
+levels(as.factor(joined_left$country))
+levels(as.factor(joined_left$year))
+
+knitr::kable(joined_left)
+```
+
+The left join merges both tables and keeps all of the rows in the "left" dataset ie gapminder. The merge happens using the column with the same name in both data frames ie country. The resulting table consists of all 1704 rows from gapminder and 7 columns (one additional from countries_18). If there is no information in countries_18 table, then there will be NA added in the `capital` column. The country that is not in gapminder but is in countries_18 is removed.
+
+```{r right}
+joined_right <- right_join(gapminder, countries_18)
+
+str(joined_right)
+levels(as.factor(joined_right$country))
+levels(as.factor(joined_right$year))
+
+knitr::kable(joined_right)
+```
+
+The resulting table keeps all the rows from countries_18 regardless of the fact if they are present in gapminder. If a country doesn't have information from there, the NA's are added - eg Russia is not in gapminder so 6 columns that were added from gapminder have values of NA for it. 
+
+All the information from gapminder for countries is kept so the table consists of 205 rows (204 for 17 countries + 1 row for one country not in gapminder) and 7 columns (6 from gapminder + one from countries_18).
+
+```{r full}
+joined_full <- full_join(gapminder, countries_18)
+
+str(joined_full)
+levels(as.factor(joined_full$country))
+levels(as.factor(joined_full$year))
+
+knitr::kable(joined_full)
+```
+
+The countries from both gapminder and countries_18 are kept when doing full join, so the resulting table consists of 1705 rows (one additional country that is not in gapminder is added) and 7 columns (6 from gapminder and 1 from countries_18). If there is no information for a specific row in either of the datasets (eg Afghanistan is not in countries_18), then NA is added for the column from a second dataset (in this case, `capital`).
+
+
+```{r semi}
+joined_semi <- semi_join(gapminder, countries_18)
+
+str(joined_semi)
+levels(as.factor(joined_semi$country))
+levels(as.factor(joined_semi$year))
+
+knitr::kable(joined_semi)
+```
+
+The result is similar to `inner_join()` but the capital column from countries_18 is not added. Ie this function filters gapminder and only keeps countries that are present in the 2nd dataset `country` column but doesn't modify it otherwise.
+
+```{r anti}
+joined_anti <- anti_join(gapminder, countries_18)
+
+str(joined_anti)
+levels(as.factor(joined_anti$country))
+levels(as.factor(joined_anti$year))
+
+knitr::kable(joined_anti)
+```
+
+This result is the opposite of semi join ie it keeps only the countries that are NOT present in countries_18. So there are 1500 rows (1704-204) and 6 columns from gapminder. The capital information from countries_18 is not added either.
+
+Overall, for all `join` functions, if the columns by which the join happens is not specified in the code, then it takes a column(s) with the same name(s) in both datasets.
+
+###### Exploring match function:
+
+```{r match}
+matching <- match(gapminder$country, countries_18$country)
+
+str(matching)
+class(matching)
+matching
+
+which(gapminder == "Canada", arr.ind = T)
+which(countries_18 == "Canada", arr.ind = T)
+matching[241:252]
+```
+
+This functions takes all the rows in gapminder from the `country` column and looks at which position the same value is found in countries_18. The output is the list of integers (position number). If the country is not found in the countries_18 `country` column, then NA is added. Otherwise, it gives the integer value - for example, Canada is the first in the countries_18 so in the `matching` 241-252 values (row numbers for Canada in gapminder) it will give 1 as an output. 
+
